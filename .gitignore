@@ -1,7 +1,8 @@
-rastertolhpl
-testpage.pdf
-*.prn
-*.ras
+.DS_Store
 *.jbg
 *.pbm
-.DS_Store
+*.prn
+*.ras
+rastertolhpl
+sp150ctl
+testpage.pdf

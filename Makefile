@@ -4,10 +4,13 @@ FILTER_DIR  = /usr/libexec/cups/filter
 QUEUE      ?= Ricoh_SP_150SUw
 PPD         = Ricoh-SP150SUw-LHPL.ppd
 
-all: rastertolhpl
+all: rastertolhpl sp150ctl
 
 rastertolhpl: rastertolhpl.c jbig.c jbig_ar.c jbig.h jbig_ar.h
 	$(CC) $(CFLAGS) -I. -o $@ rastertolhpl.c jbig.c jbig_ar.c -lcups
+
+sp150ctl: sp150ctl.c
+	$(CC) $(CFLAGS) -o $@ sp150ctl.c -framework IOKit -framework CoreFoundation
 
 # sudo make install  -> installs the filter and adds the USB print queue
 install: rastertolhpl
@@ -28,6 +31,6 @@ testpage:
 	python3 tools/make_testpdf.py testpage.pdf && lp -d $(QUEUE) testpage.pdf
 
 clean:
-	rm -f rastertolhpl testpage.pdf
+	rm -f rastertolhpl sp150ctl testpage.pdf
 
 .PHONY: all install uninstall testpage clean

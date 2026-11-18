@@ -1,9 +1,16 @@
 # rastertolhpl — native macOS driver for the Ricoh SP 150 series
 
-Apple-Silicon-native CUPS filter for the Ricoh SP 150 / 150w / 150SU / 150SUw
+Apple-Silicon-native tools for the Ricoh SP 150 / 150w / 150SU / 150SUw
 (host-based "GDI" printers). No Ricoh software, no Rosetta.
 
-## Install / remove
+- `rastertolhpl` — CUPS filter + PPD for printing over **USB**
+- `sp150ctl` — set the printer's **Wi-Fi / IPv4** settings over USB
+
+**Over Wi-Fi no driver is needed:** the printer's IPP server accepts PDF, so add the
+Bonjour entry in System Settings with *Use: Generic PDF Printer*. The USB port only
+speaks the host-based LHPL language, which is what `rastertolhpl` is for.
+
+## Install / remove (USB printing)
 
 ```sh
 make                 # build the filter
@@ -51,6 +58,44 @@ Not implemented: manual duplex (`DUPLEX=ON`, `MDPXS=2`, `JOBATTR=PCNT`), 1200 dp
 (width doubles, `RESOLUTION=1200`), the vendor's toner-save/density curves.
 
 `tools/lhpl_parse.py file.prn [prefix]` dumps a stream and extracts the JBIG pages.
+
+## sp150ctl — Wi-Fi / network settings over USB
+
+```sh
+make sp150ctl
+./sp150ctl info                                  # Wi-Fi + IPv4 (passphrase never printed)
+./sp150ctl scan                                  # networks the printer sees (slow, up to ~1 min)
+./sp150ctl wifi-set <SSID>                       # prompts for the passphrase on the TTY
+./sp150ctl ip static <addr> <netmask> <gateway>
+./sp150ctl ip dhcp
+./sp150ctl drain                                 # collect a stuck reply after a timeout
+```
+
+The printer only joins 2.4 GHz networks with WPA2 (WPA2/WPA3 mixed mode is fine).
+Note that a FRITZ!Box guest network is isolated from the home network, so a Mac
+on the guest Wi-Fi will not see the printer.
+
+### Settings protocol ("VOP", from the vendor's RICOH Printer utility)
+
+USB vendor control transfers on the printer interface (interface 1):
+
+- OUT: `bmRequestType 0x41, bRequest 0x4d, wValue 0x3c2b, wIndex 0x0100`
+- IN: `bmRequestType 0xc1, bRequest 0x00, wValue 0, wIndex 0x0100`, read
+  byte-wise until `4d 3c`, then the rest
+
+Frame: `4d 3c 2b 1a | cmd (u16 LE) | len (u16 LE) = payload + 3 | 13 01 | sub | payload`.
+The reply has the same header; byte 10 is the status for set commands (0 = OK) and
+the payload starts at byte 11 for get commands.
+
+| cmd/sub | function | payload |
+|---|---|---|
+| 0x106/0, 0x106/1 | get / set Wi-Fi block | 180 bytes: [0] enabled, [4] security (3 = WPA2-PSK seen), [8..39] SSID, [40..103] passphrase |
+| 0x106/0xff | set Wi-Fi without reply (used when connected over Wi-Fi) | same 180 bytes |
+| 0x106/7 | access point list | 10 × 34 bytes: SSID[32] + 2 flag bytes |
+| 0x106/8 | Wi-Fi status | 1 byte (1 seen while associated) |
+| 0x105/0, 0x105/1 | get / set IPv4 | 128 bytes, first 14 used: [0] mode (1 = static; 0 = DHCP per vendor UI order), [2..5] address, [6..9] netmask, [10..13] gateway |
+| 0x105/2, 0x105/3 | get / set IPv6 | 340 bytes |
+| 0x107/x | device settings (toner end, power save, power off, admin password, region) | 1 or 32 bytes |
 
 ## License
 
